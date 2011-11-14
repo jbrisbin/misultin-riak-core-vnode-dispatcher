@@ -1,0 +1,12 @@
+{application, hello_world, [
+  {description, "Hello World! Test App"},
+  {vsn, "1.0"},
+  {registered, []},
+  {applications, [
+    kernel,
+    stdlib,
+    riak_core
+  ]},
+  {mod, { hello_world_app, []}},
+  {env, []}
+]}.
