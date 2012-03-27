@@ -9,7 +9,7 @@
 start(_StartType, _StartArgs) ->
   case hello_world_sup:start_link() of
     {ok, Pid} ->
-      ok = riak_core:register_vnode_module(hello_world_vnode),
+      ok = riak_core:register([{vnode_module, hello_world_vnode}]),
       ok = riak_core_node_watcher:service_up(hello_world, self()),
       
       {ok, Pid};

@@ -26,21 +26,21 @@
 }).
 
 start_vnode(I) ->
-  io:format("starting ~p~n", [I]),
+  %%io:format("starting ~p~n", [I]),
   riak_core_vnode_master:get_vnode_pid(I, ?MODULE).
 
 init([Partition]) ->
-  io:format("started hello world vnode at ~p~n", [Partition]),
+  %%io:format("started hello world vnode at ~p~n", [Partition]),
   {ok, #state { partition = Partition }}.
 
 handle_command({'GET', [], Req}, _Sender, State) ->
-  io:format("from misultin: ~p~n", [Req]),
+  %io:format("from misultin: ~p ~p~n", [Req, self()]),
   Response = Req:ok([{"Content-Type", "text/plain"}], <<"Hello World!">>),
   {reply, {ok, Response}, State};
 
-handle_command(Msg, _Sender, State) ->
-  io:format("unhandled command: ~p~n", [Msg]),
-  {noreply, State}.
+handle_command({_, _, Req}, _Sender, State) ->
+  io:format("unhandled command: ~p~n", [Req]),
+  {reply, {ok, Req:respond(404)}, State}.
 
 handle_coverage(Request, KeySpaces, Sender, State) ->
   io:format("handle_coverage: ~p ~p ~p ~p~n", [Request, KeySpaces, Sender, State]),

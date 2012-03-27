@@ -27,12 +27,13 @@ init([]) ->
     Method = Req:get(method), 
     Resource = Req:resource([lowercase, urldecode]),
 
-    Hash = riak_core_util:chash_key({Method, Resource}),
+    Id = mkid(Method, Resource),    
+    Hash = riak_core_util:chash_key({Resource, Id}),
     case riak_core_apl:get_primary_apl(Hash, 1, hello_world) of
       [{Index, _Type}] ->
           case riak_core_vnode_master:sync_spawn_command(Index, {Method, Resource, Req}, hello_world_vnode_master) of
             {ok, Resp} -> 
-              io:format("response: ~p~n", [Resp]),
+              %io:format("response: ~p~n", [Resp]),
               Resp;
             {error, Reason} -> Req:respond(500, Reason)
           end;
@@ -63,3 +64,10 @@ terminate(Reason, State) ->
 code_change(_OldVsn, State, _Extra) ->
   % io:format("code_change: ~p ~p ~p~n", [OldVsn, State, Extra]),
   {ok, State}.
+
+mkid(Method, Resource) ->
+  % Absconded from riak_core_util:mkclientid/1
+  {{Y,Mo,D},{H,Mi,S}} = erlang:universaltime(),
+  {_,_,NowPart} = now(),
+  Id = erlang:phash2([Y,Mo,D,H,Mi,S,Method,Resource,NowPart]),
+  io_lib:format("~p", [Id]).
