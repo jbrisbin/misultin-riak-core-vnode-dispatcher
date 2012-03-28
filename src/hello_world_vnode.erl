@@ -26,7 +26,6 @@
 }).
 
 start_vnode(I) ->
-  %%io:format("starting ~p~n", [I]),
   riak_core_vnode_master:get_vnode_pid(I, ?MODULE).
 
 init([Partition]) ->
@@ -34,12 +33,17 @@ init([Partition]) ->
   {ok, #state { partition = Partition }}.
 
 handle_command({'GET', [], Req}, _Sender, State) ->
-  %io:format("from misultin: ~p ~p~n", [Req, self()]),
   Response = Req:ok([{"Content-Type", "text/plain"}], <<"Hello World!">>),
   {reply, {ok, Response}, State};
 
-handle_command({_, _, Req}, _Sender, State) ->
-  lager:warning("unhandled command: ~p~n", [Req]),
+handle_command(Req={websocket, ["data"], _Headers, Data, Ws}, _Sender, State) ->
+  lager:info("websocket request: ~p", [Req]),
+  lager:info("got websocket data: ~p", [Data]),
+  Ws:send("Hello World!"),
+  {noreply, State};
+  
+handle_command({Method, Path, Req}, _Sender, State) ->
+  lager:warning("unhandled command: ~p~n", [{Method, Path, Req}]),
   {reply, {ok, Req:respond(404)}, State}.
 
 handle_coverage(Request, KeySpaces, Sender, State) ->

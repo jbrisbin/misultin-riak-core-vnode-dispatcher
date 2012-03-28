@@ -33,10 +33,15 @@ init([]) ->
   end,
   
   lager:info("Starting HTTP server on ~p", [WebPort]),
+  {ok, Cwd} = file:get_cwd(),
+  StaticPath = Cwd ++ "/www",
+  lager:info("Serving static resources from ~p", [StaticPath]),
   {ok, ServerPid} = misultin:start_link([
     {port, WebPort}, 
     {backlog, 1000},
-    {loop, fun dispatch/1}
+    {static, StaticPath},
+    {loop, fun dispatch/1},
+    {ws_loop, fun ws_dispatch/1}
   ]),
   
   {ok, #state { server = ServerPid }}.
@@ -54,6 +59,7 @@ handle_info(Msg, State) ->
   {noreply, State}.
 
 terminate(Reason, State) ->
+  misultin:stop(),
   io:format("terminate: ~p ~p~n", [Reason, State]),
   ok.
 
@@ -77,9 +83,32 @@ dispatch(Req) ->
     {ok, R} -> R;
     {error, Reason} -> Req:respond(500, Reason);
     Unhandled -> 
-      io:format("unhandled: ~p~n", [Unhandled]),
+      lager:warning("Unhandled reply: ~p~n", [Unhandled]),
       Req:respond(500)
   end.
+
+ws_dispatch(Ws) ->
+  Path = Ws:get(path),
+  Headers = Ws:get(headers),
+  Id = mkid(websocket, Path),    
+  Hash = riak_core_util:chash_key({Path, Id}),
+  
+  Read = fun(F) ->
+    receive
+      {browser, Data} ->
+        Index = case riak_core_apl:get_primary_apl(Hash, 1, hello_world) of
+          [{Idx, _Type}] -> Idx;
+          _ -> {0, node()}
+        end,
+        lager:debug("Dispatching to ~p", [Index]),
+
+        riak_core_vnode_master:command(Index, {websocket, string:tokens(Path, "/"), Headers, Data, Ws}, hello_world_vnode_master),
+        F(F);
+      _ ->
+        F(F)
+    end
+  end,
+  Read(Read).
   
 mkid(Method, Resource) ->
   % Absconded from riak_core_util:mkclientid/1

@@ -1,0 +1,22 @@
+<!doctype html>
+<html>
+	<head>
+		<title>riak_core / misultin Integeration Test</title>
+		<script>
+			var ws = new WebSocket("ws://localhost:3000/data"); 
+			
+			ws.onmessage = function(msg) {
+				console.log("from server: ", msg.data);
+			}
+			
+			ws.onopen = function() {
+				console.log("sending data to client...");
+				ws.send("data from client");
+			}
+			
+		</script>
+	</head>
+	<body>
+		<div id="content"></div>
+	</body>
+</html>
