@@ -30,7 +30,7 @@ start_vnode(I) ->
   riak_core_vnode_master:get_vnode_pid(I, ?MODULE).
 
 init([Partition]) ->
-  %%io:format("started hello world vnode at ~p~n", [Partition]),
+  lager:debug("started ~p at partition ~p", [?MODULE, Partition]),
   {ok, #state { partition = Partition }}.
 
 handle_command({'GET', [], Req}, _Sender, State) ->
@@ -39,17 +39,19 @@ handle_command({'GET', [], Req}, _Sender, State) ->
   {reply, {ok, Response}, State};
 
 handle_command({_, _, Req}, _Sender, State) ->
-  io:format("unhandled command: ~p~n", [Req]),
+  lager:warning("unhandled command: ~p~n", [Req]),
   {reply, {ok, Req:respond(404)}, State}.
 
 handle_coverage(Request, KeySpaces, Sender, State) ->
-  io:format("handle_coverage: ~p ~p ~p ~p~n", [Request, KeySpaces, Sender, State]),
+  lager:debug("handle_coverage: ~p ~p ~p ~p~n", [Request, KeySpaces, Sender, State]),
   {continue, State}.
   
-handle_exit(_Pid, Reason, State) ->
+handle_exit(Pid, Reason, State) ->
+  lager:debug("handle exit: ~p ~p~n", [Pid, Reason]),
   {stop, Reason, State}.
 
-handle_handoff_command(_Message, _Sender, State) ->
+handle_handoff_command(Message, Sender, State) ->
+  lager:debug("handle handoff: ~p ~p~n", [Message, Sender]),
   {forward, State}.
 
 handoff_starting(_TargetNode, State) ->

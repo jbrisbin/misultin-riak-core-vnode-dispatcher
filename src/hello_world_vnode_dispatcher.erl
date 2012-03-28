@@ -19,29 +19,25 @@
 start_link() ->
   gen_server2:start_link({local, ?MODULE}, ?MODULE, [], [{timeout, infinity}]).
 
-init([]) ->
-  process_flag(trap_exit, true),
-
-  {ok, ServerPid} = misultin:start_link([{port, 3000}, {loop, fun(Req) -> 
-    
-    Method = Req:get(method), 
-    Resource = Req:resource([lowercase, urldecode]),
-
-    Id = mkid(Method, Resource),    
-    Hash = riak_core_util:chash_key({Resource, Id}),
-    case riak_core_apl:get_primary_apl(Hash, 1, hello_world) of
-      [{Index, _Type}] ->
-          case riak_core_vnode_master:sync_spawn_command(Index, {Method, Resource, Req}, hello_world_vnode_master) of
-            {ok, Resp} -> 
-              %io:format("response: ~p~n", [Resp]),
-              Resp;
-            {error, Reason} -> Req:respond(500, Reason)
-          end;
-       {error, Reason} -> Req:respond(500, Reason)
-    end
-    
-  end}]),
+init([]) ->  
+  {ok, MasterNode} = application:get_env(master_node),
   
+  case node() of
+    MasterNode -> ok;
+    _ -> riak_core:join(MasterNode)
+  end,
+  
+  WebPort = case application:get_env(web_port) of
+    {ok, P} -> P;
+    _ -> 3000
+  end,
+  
+  lager:info("Starting HTTP server on ~p", [WebPort]),
+  {ok, ServerPid} = misultin:start_link([
+    {port, WebPort}, 
+    {backlog, 1000},
+    {loop, fun dispatch/1}
+  ]),
   
   {ok, #state { server = ServerPid }}.
 
@@ -61,10 +57,30 @@ terminate(Reason, State) ->
   io:format("terminate: ~p ~p~n", [Reason, State]),
   ok.
 
-code_change(_OldVsn, State, _Extra) ->
-  % io:format("code_change: ~p ~p ~p~n", [OldVsn, State, Extra]),
+code_change(OldVsn, State, Extra) ->
+  io:format("code_change: ~p ~p ~p~n", [OldVsn, State, Extra]),
   {ok, State}.
 
+dispatch(Req) ->
+  Method = Req:get(method), 
+  Resource = Req:resource([lowercase, urldecode]),
+
+  Id = mkid(Method, Resource),    
+  Hash = riak_core_util:chash_key({Resource, Id}),
+  Index = case riak_core_apl:get_primary_apl(Hash, 1, hello_world) of
+    [{Idx, _Type}] -> Idx;
+    _ -> {0, node()}
+  end,
+  lager:debug("Dispatching to ~p", [Index]),
+  
+  case riak_core_vnode_master:sync_spawn_command(Index, {Method, Resource, Req}, hello_world_vnode_master) of
+    {ok, R} -> R;
+    {error, Reason} -> Req:respond(500, Reason);
+    Unhandled -> 
+      io:format("unhandled: ~p~n", [Unhandled]),
+      Req:respond(500)
+  end.
+  
 mkid(Method, Resource) ->
   % Absconded from riak_core_util:mkclientid/1
   {{Y,Mo,D},{H,Mi,S}} = erlang:universaltime(),

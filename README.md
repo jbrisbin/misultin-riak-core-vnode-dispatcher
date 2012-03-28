@@ -28,23 +28,17 @@ sort of functionality. It's code 202 - Accepted.
 
 ### How do I use it?
 
-That depends on your use case. I would start with your own riak_core application that 
-already has your own vnodes configured and started in it. You would then copy out the 
-`hello_world_vnode_dispatcher.erl` file and put that into your application (it's a gen_server). 
-You'll want to edit the the `loop` function to maybe parameterize the vnode you dispatch to. 
-Maybe you want to make that based on mapping a query parameter or path segment to a vnode 
-name (I wouldn't use direct vnode names as parameters in your web app as that would expose 
-important information about the internal structure of your site to a potential attacker).
-
-You'll also likely want to parameterize the port your app starts on. I'm assuming you're a savvy-
-enough OTP-nician to figure out how to do that. This isn't a HOWTO so much as example code 
-showing you how I did it. Grab what you need, throw away the rest! :)
-
-### Running this code
-
-To test out this code, build it by typing `make` then running the `./console.sh` script, which 
-will start the Erlang console with the right parameters. Once started, send a web request.
+To test out this code, build it by typing `make` then issue the command `./node1.sh`. Send a web request 
+using curl or somesuch:
 
     curl -v http://localhost:3000/
 
 You should get "Hello World!" back.
+
+To test the clustering capabilities, open a second console window and start another node using this `./node2.sh` 
+script. Once started, the two nodes should be clustered together and in a riak_core ring together. Send 
+another request like above to make sure both instances can respond.
+
+You know have a clustered web application! If you kill one of the processes, your application will continue 
+to function (provided you send HTTP traffic to the other misultin server, of course...this is where an 
+haproxy or other load-balancer would come in).
